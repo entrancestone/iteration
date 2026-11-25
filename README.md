@@ -1,0 +1,365 @@
+<p align="center">Before I go to bed, I tell my agents:</p>
+<h1 align="center">good night, have fun</h1>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/iteration"
+    ><img
+      alt="npm"
+      src="https://img.shields.io/npm/v/iteration?style=flat-square"
+  /></a>
+  <a href="https://github.com/entrancestone/iteration/actions/workflows/ci.yml"
+    ><img
+      alt="CI"
+      src="https://img.shields.io/github/actions/workflow/status/entrancestone/iteration/ci.yml?style=flat-square&label=ci"
+  /></a>
+  <a href="https://github.com/entrancestone/iteration/actions/workflows/release-please.yml"
+    ><img
+      alt="Release"
+      src="https://img.shields.io/github/actions/workflow/status/entrancestone/iteration/release-please.yml?style=flat-square&label=release"
+  /></a>
+  <a
+    href="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=flat-square"
+    ><img
+      alt="Platform"
+      src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=flat-square"
+  /></a>
+</p>
+
+<p align="center">
+  <img src="docs/splash.png" alt="iteration - Good Night, Have Fun" width="800">
+</p>
+
+> **iteration** is a fork of [kunchenguid/gnhf](https://github.com/kunchenguid/gnhf) (MIT). Changes: renamed from `gnhf` to `iteration` (CLI, package, `ITERATION_*` environment variables, `.iteration/` run directories, `iteration/` branch prefix), and the anonymous usage-telemetry client and its build-time host/website-ID settings are removed, so it sends no analytics. The splash image still shows the original branding.
+
+Never wake up empty-handed.
+
+iteration is a [ralph](https://ghuntley.com/ralph/), [autoresearch](https://github.com/karpathy/autoresearch)-style orchestrator that keeps your agents running while you sleep - each iteration makes one small, committed, documented change towards an objective.
+You wake up to a branch full of clean work and a log of everything that happened.
+
+- **Dead simple** - one command starts an autonomous loop that runs until you request stop or a configured runtime cap is reached
+- **Long running** - each iteration is committed on success and rolled back on failure, with sensible retries; [How It Works](#how-it-works) has the full failure-handling rules
+- **Live terminal title** - interactive runs keep your terminal title updated with live status, token totals, and commit count, then clear or restore it on exit depending on terminal support; token totals prefixed with `~` are estimates
+- **Exit summary** - every run ends with a permanent summary covering elapsed time, branch, iterations, tokens, branch diff stats, local notes/log paths, and review commands
+- **Agent-agnostic** - works with the popular coding agent CLIs plus any ACP target out of the box; see [Agents](#agents) for the roster
+
+## Quick Start
+
+```sh
+$ iteration "reduce complexity of the codebase without changing functionality"
+# have a good sleep
+```
+
+```sh
+$ iteration "reduce complexity of the codebase without changing functionality" \
+    --max-iterations 10 \
+    --max-tokens 5000000
+# have a good nap
+```
+
+```sh
+# Run multiple agents on the same repo simultaneously using worktrees
+$ iteration --worktree "implement feature X" &
+$ iteration --worktree "add tests for module Y" &
+$ iteration --worktree "refactor the API layer" &
+```
+
+```sh
+# Commit directly on the current branch and push after each successful iteration
+$ iteration --current-branch --push "keep improving this app"
+```
+
+Run `iteration` from inside a Git repository with a clean working tree. If you are starting from a plain directory, run `git init` first.
+`iteration` supports macOS, Linux, and Windows.
+
+## Install
+
+**npm**
+
+```sh
+npm install -g iteration
+```
+
+**From source**
+
+```sh
+git clone https://github.com/entrancestone/iteration.git
+cd iteration
+corepack enable
+pnpm install
+pnpm run build
+pnpm link --global
+```
+
+## Agent Skill
+
+The npm package includes an agent-facing skill at `skills/iteration/SKILL.md`. Agents that support local skills can copy or reference this file to learn how to run ITERATION in Hands-Off mode for bounded overnight work, or Companion mode when the outer agent should steer and review a long-running ITERATION run.
+
+After installing from npm, the skill is available under the installed package directory. From a source checkout, use `skills/iteration/SKILL.md` directly.
+
+## How It Works
+
+```
+                    ┌─────────────┐
+                    │  iteration start │
+                    └──────┬──────┘
+                           ▼
+                ┌──────────────────────┐
+                │  validate clean git  │
+                │  create or use branch │
+                │  write prompt.md     │
+                └──────────┬───────────┘
+                           ▼
+              ┌────────────────────────────┐
+              │  build iteration prompt    │◄──────────────┐
+              │  (inject notes.md context) │               │
+              └────────────┬───────────────┘               │
+                           ▼                               │
+              ┌────────────────────────────┐               │
+              │  invoke your agent         │               │
+              │  (non-interactive mode)    │               │
+              └────────────┬───────────────┘               │
+                           ▼                               │
+                    ┌─────────────┐                        │
+                    │  success?   │                        │
+                    └──┬──────┬───┘                        │
+                  yes  │      │  no                        │
+                       ▼      ▼                            │
+              ┌──────────┐  ┌───────────┐                  │
+              │  commit  │  │ reset or  │                  │
+              │  append  │  │  repair   │                  │
+              │ notes.md │  │           │                  │
+              │maybe wait│  │ maybe wait│                  │
+              └────┬─────┘  └─────┬─────┘                  │
+                   │              │                        │
+                   │   ┌──────────┘                        │
+                   ▼   ▼                                   │
+              ┌────────────┐    yes   ┌──────────┐         │
+              │ 3 consec.  ├─────────►│  abort   │         │
+              │ failures   │          └────▲─────┘         │
+              │ or perm.   ├───────────────┘               │
+              │ error?     │                               │
+              └─────┬──────┘                               │
+                 no │                                      │
+                    └──────────────────────────────────────┘
+```
+
+- **Incremental commits** - each successful iteration is a separate unsigned git commit, so you can cherry-pick or revert individual changes without GPG or SSH signing prompts blocking the run; if `git commit` fails, iteration preserves the uncommitted work and asks the next agent iteration to repair it
+- **Failure handling** - failed iterations are rolled back with `git reset --hard` except commit failures, which preserve uncommitted work for repair; agent-reported failures proceed to the next iteration immediately, retryable hard agent errors use exponential backoff, and permanent agent errors such as Claude low credit balance abort immediately and print the run log path. Complete no-op iterations are reported as failures and count toward the consecutive-failure abort limit. If the run exits with a pending commit failure, the exit summary warns that uncommitted changes were left for repair.
+- **OpenCode empty responses** - when a turn completes (`session.idle`) without structured output or a final answer, iteration asks for a final summary once more in the same session, preserving the work within the same iteration and combining token usage from both turns. A second empty response fails the iteration. If either stream ends before `session.idle`, the iteration fails without another continuation, even if answer text arrived. These failures follow the rollback and backoff rules above.
+- **Usage-limit waits** - iteration waits out an exhausted usage window (e.g. the subscription 5-hour window) instead of running through it, in both forms it takes. When Claude rejects requests, the iteration is rolled back but not counted as a failure; iteration reads the reset time from the agent's rate-limit event, waits until shortly after the window resets, then retries the same iteration automatically, so overnight runs resume on their own. Pass `--fallback-model <model>` with `--agent claude` to retry the first rejected iteration on that model instead; without the flag, iteration never changes models. If no reset time is reported for a rejection, it retries on a bounded escalating interval instead. When usage credits are enabled the provider serves the request and bills the overage rather than rejecting it. A billed iteration that succeeded keeps its committed work and is counted normally; one that failed is rolled back and counted as a failure like any other. Either way iteration then waits for the reset before starting the next iteration, so the run stops spending credits without throwing away finished work. If the reported reset time has already passed, the included window is back and the run simply continues - if the provider is still billing, the next iteration reports it again with a fresh reset time. If no reset time comes with it at all, or one so far out that iteration cannot sleep through it in a single wait, iteration aborts the run rather than keep buying iterations by probing. Use `--max-rate-limit-wait` to set a total wait leash for the run; if the next wait would exceed it, iteration aborts cleanly. Ctrl+C during the wait works as usual.
+- **Runtime caps** - `--max-iterations` stops before the next iteration begins, `--max-tokens` can abort mid-iteration once reported usage reaches the cap across input, output, cache-read, and cache-write tokens, and `--stop-when` ends the loop after an iteration whose agent output reports the natural-language condition is met unless a commit failure needs repair first; resumed runs reuse the saved stop condition unless you pass a new value, or `--stop-when ""` to clear it; pending commit-failure repair work is preserved and other uncommitted work is rolled back, and in the interactive TUI the final state remains visible until you press Ctrl+C to exit
+- **Iteration progress** - with `--max-iterations`, the interactive stats line shows `completed/max` between the elapsed timer and token totals. The count includes finished iterations restored on resume and advances only after the active iteration finishes, whether it succeeds or fails. Runs without an iteration cap omit this segment. To fit crowded stats rows, separator spaces are removed and, if needed, token labels become `Σ` (total), `↓` (input), and `↑` (output).
+- **Terminal resizing** - after a resize notification reaches iteration, the next frame redraws the TUI title and prompt, even if the terminal has already returned to its original size or a synchronous Git operation delayed notification delivery. Ordinary animation frames continue to update only changed content. This recovery was validated on macOS; Windows was not tested locally. On Windows, a rapid shrink and return that produces no resize notification can still leave content missing. Refs [#166](https://github.com/entrancestone/iteration/issues/166).
+- **Iteration finalization** - agents are expected to finish validation, stop any background processes they started, and only then emit the final JSON result for the iteration
+- **Graceful interrupts** - in the interactive TUI, the first Ctrl+C requests a graceful stop and lets the current iteration finish (or ends backoff early), the second Ctrl+C force-stops immediately, and `SIGTERM` also force-stops immediately
+- **Exit summary** - after shutdown cleanup, iteration prints a permanent stdout summary with the final branch, elapsed time, iteration and token totals, branch diff stats, notes/debug-log paths, and review commands
+- **Shared memory** - the agent reads `notes.md` (built up from prior iterations) to communicate across iterations
+- **Local run metadata** - iteration stores prompt, notes, stop conditions, commit-message convention metadata, and a final `end-state.json` sidecar with the exit status, stop condition, agent error, and counters under `.iteration/runs/`, and ignores it locally, so your branch only contains intentional work
+- **Resume support** - run `iteration` while on an existing `iteration/` branch to pick up where a previous run left off; if you provide a different prompt, iteration asks whether to update the saved prompt and continue with the existing history, start a new branch, or quit. New runs whose generated branch already exists use a numeric suffix such as `iteration/<slug>-1`.
+
+### Live Branch Mode
+
+Pass `--current-branch` to run on the branch you are already on instead of creating a `iteration/` branch.
+Pass `--push` to push the current branch after each successful iteration.
+Together, `--current-branch --push` is useful for loose projects where you want a deployed or locally watched branch to update throughout the run.
+
+- Re-running the same prompt with `--current-branch` resumes the existing `.iteration/runs/<runId>/` history on a clean working tree and continues iteration numbering.
+- Push failures abort the run after preserving the successful local commit.
+- iteration never force-pushes or auto-pulls for this mode.
+- `--push` also works with the default `iteration/` branch mode and sets `origin` as the upstream when needed.
+- Do not combine `--current-branch` with `--worktree`; iteration exits with an error because those modes choose different working directories.
+
+### Worktree Mode
+
+Pass `--worktree` to run each agent in an isolated [git worktree](https://git-scm.com/docs/git-worktree). This lets you launch multiple agents on the same repo simultaneously - each gets its own working directory and branch without interfering with the others or your main checkout.
+
+```
+<repo>/                              ← your repo (unchanged)
+<repo>-iteration-worktrees/
+  ├── <run-slug-1>/                  ← worktree for agent 1
+  └── <run-slug-2>/                  ← worktree for agent 2
+```
+
+- Worktrees with commits are **preserved** after the run so you can review, merge, or cherry-pick the work. iteration prints the path and cleanup command.
+- Re-running the same prompt with `--worktree` resumes a preserved matching worktree when possible; otherwise iteration creates a suffixed worktree such as `<run-slug>-1` if the original name is unavailable.
+- Worktrees with **no commits** are automatically removed on exit unless a pending commit failure left uncommitted work to inspect or repair.
+- Known limitation: on Linux, when sleep prevention re-execs iteration under `systemd-inhibit`, a worktree with no commits is left in place instead of being removed; remove it manually with `git worktree remove`. Tracked as `iteration-reexec-worktree-leak-l1`.
+- `--worktree` must be run from a non-iteration branch (typically `main`).
+
+## CLI Reference
+
+| Command                   | Description                                     |
+| ------------------------- | ----------------------------------------------- |
+| `iteration "<prompt>"`         | Start a new run with the given objective        |
+| `iteration`                    | Resume a run (when on an existing iteration/ branch) |
+| `echo "<prompt>" \| iteration` | Pipe prompt via stdin                           |
+| `cat prd.md \| iteration`      | Pipe a large spec or PRD via stdin              |
+
+If you run `iteration` on an existing `iteration/` branch with a different prompt, iteration asks whether to update `prompt.md` and continue the existing run history, start a new branch, or quit. When the prompt came from stdin, that confirmation is read from the controlling terminal, so it must be available.
+
+### Flags
+
+| Flag                               | Description                                                                                        | Default                |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------- |
+| `--agent <agent>`                  | Agent to use: a native agent name or `acp:<target-or-command>`; see [Agents](#agents)              | config file (`claude`) |
+| `--model <model>`                  | Model for the agent; overrides `agentModel.<agent>` from the config file                           | config file            |
+| `--max-iterations <n>`             | Abort after `n` total iterations                                                                   | unlimited              |
+| `--max-tokens <n>`                 | Abort after `n` total input+output+cache tokens                                                    | unlimited              |
+| `--max-run-time <duration>`        | Start no new iteration after this much total run time (`30m`, `8h`)                                | unlimited              |
+| `--max-rate-limit-wait <duration>` | Abort after this much total Claude usage-limit wait (`30m`, `2h`, or `0`)                          | 24h safety cap         |
+| `--stop-when <cond>`               | End when the agent reports this condition, after any commit-failure repair; persists across resume | unlimited              |
+| `--prevent-sleep <mode>`           | Prevent system sleep during the run (`on`/`off` or `true`/`false`)                                 | config file (`on`)     |
+| `--worktree`                       | Run in a separate git worktree (enables multiple agents concurrently)                              | `false`                |
+| `--current-branch`                 | Run on the current branch instead of creating a `iteration/` branch                                     | `false`                |
+| `--push`                           | Push the current branch after each successful iteration                                            | `false`                |
+| `--meteor-frequency <n>`           | Set TUI meteor frequency from 0 to 5 (`0` disables meteors)                                        | `3`                    |
+| `--version`                        | Show version                                                                                       |                        |
+
+`--max-run-time` caps an unattended run by wall-clock time, for example an overnight run with a local model: `iteration --max-run-time 8h "improve the test coverage"`.
+Local models are less reliable at reporting a `--stop-when` condition, so let the loop keep iterating until the deadline instead.
+Once the time has passed, iteration starts no new iteration and ends the run like `--max-iterations` does; an iteration already in progress finishes first.
+A usage-limit wait (see `--max-rate-limit-wait`) that starts before the deadline, or right after an iteration that the provider rejected for usage, is not cut short; the run ends once that wait is over.
+On resume, the clock starts again.
+
+## Configuration
+
+Config lives at `~/.iteration/config.yml`.
+If the file does not exist yet, `iteration` creates it on first run with its defaults.
+A supplied `--agent` is written as the default agent.
+With the default configuration, it has this exact content:
+
+<!-- This block mirrors src/core/bootstrap-config.golden.yml and is pinned to it by src/core/bootstrap-config.test.ts; update both together. -->
+
+```yaml
+# Agent to use by default: native agent name or acp:<target-or-command>
+agent: claude
+
+# Custom paths to native agent binaries (optional)
+# Paths may be absolute, bare executable names on PATH,
+# ~-prefixed, or relative to this config directory.
+# Note: rovodev overrides must point to an acli-compatible binary.
+# agentPathOverride:
+#   claude: /path/to/custom-claude
+#   codex: /path/to/custom-codex
+#   copilot: /path/to/custom-copilot
+#   pi: /path/to/custom-pi
+#   cursor: /path/to/custom-cursor-agent
+
+# Native agent CLI arg overrides (optional)
+# ACP targets do not support path or arg overrides.
+# agentArgsOverride:
+#   codex:
+#     - -m
+#     - gpt-5.4
+#     - -c
+#     - model_reasoning_effort="high"
+#     - --full-auto
+#   copilot:
+#     - --model
+#     - gpt-5.4
+#   pi:
+#     - --provider
+#     - openai-codex
+#     - --model
+#     - gpt-5.5
+#     - --thinking
+#     - high
+#   cursor:
+#     - --model
+#     - composer-2.5
+
+# Models for supported native agents (optional)
+# Values are forwarded to the CLI except opencode, which receives
+# its model in the request body.
+# agentModel:
+#   claude: sonnet
+#   codex: gpt-5.4
+#   opencode: fireworks-ai/accounts/fireworks/models/qwen3p6-plus
+
+# Custom ACP target commands (optional)
+# Maps acp:<target> names to spawn commands. Useful for naming a
+# local or beta build of an ACP agent.
+# acpRegistryOverrides:
+#   my-fork: "/usr/local/bin/my-claude-code-fork --acp"
+#   staging: "node /opt/staging/agent.mjs"
+
+# Commit message convention (optional)
+# Defaults to: iteration <iteration>: <summary>
+# Use Conventional Commits semantic-release headers:
+# commitMessage:
+#   preset: conventional
+
+# Abort after this many consecutive failures
+maxConsecutiveFailures: 3
+
+# Prevent the machine from sleeping during a run
+preventSleep: true
+```
+
+CLI flags override config file values. `--prevent-sleep` accepts `on`/`off` as well as `true`/`false`; the config file always uses a boolean.
+The iteration, token, and rate-limit-wait caps are runtime-only flags and are not persisted in `config.yml`; `--stop-when` is persisted per run for resume, but not in config.
+
+`agentArgsOverride.<name>` lets you pass through extra CLI flags for any native agent in the [Agents](#agents) table.
+ACP targets do not support path or arg overrides in this version.
+Use `acpRegistryOverrides` to map `acp:<target>` names to custom spawn commands for local, forked, or beta ACP agents.
+You can also pass a raw custom ACP server command directly as a quoted `acp:` spec, for example `iteration --agent 'acp:./bin/dev-acp --profile ci' "fix the tests"`.
+
+- Use it for agent-specific profiles or reasoning settings that lack a dedicated `iteration` config field. Set a model with `agentModel.<name>` in config or `--model <model>` for a run; `--model` wins. OpenCode requires a `provider/model` pair, and its `--model`/`-m` overrides are rejected because `opencode serve` does not accept them. Rovo Dev model overrides are unsupported; set `agent.modelId` in Rovo Dev settings instead.
+- For `codex`, `claude`, `copilot`, and `cursor`, `iteration` adds its usual non-interactive permission default only when you do not provide your own permission or execution-mode flag. If you set one explicitly, `iteration` treats that as user-managed and does not add its default on top.
+- Flags that `iteration` manages itself for a given agent, such as output-shaping or local-server startup flags, are rejected during config loading so you get a clear error instead of duplicate-argument ambiguity. For `pi` and `cursor`, `--api-key` is also blocked; configure credentials via Pi's own config or the `CURSOR_API_KEY` environment variable, not via `agentArgsOverride`.
+
+`commitMessage` controls the subject line that iteration uses for each successful iteration commit.
+
+- Omit it to keep the default `iteration <iteration>: <summary>` format.
+- Set `preset: conventional` to ask the agent for `type` and optional `scope`, then commit as `type(scope): summary` for semantic-release style workflows. Valid types are `build`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `test`, and `chore`; invalid or missing types fall back to `chore`, and empty scopes are omitted.
+- The resolved commit-message convention is saved per run, so resuming keeps the original subject format even if `config.yml` changes later.
+
+### Custom Agent Paths
+
+Use `agentPathOverride` to point any native agent at a custom binary - useful for wrappers like Claude Code Switch or custom Codex builds that accept the same flags and arguments as the original:
+
+```yaml
+agentPathOverride:
+  claude: ~/bin/claude-code-switch
+  codex: /usr/local/bin/my-codex-wrapper
+  copilot: ~/bin/copilot-wrapper
+  pi: ~/bin/pi-wrapper
+  cursor: ~/bin/cursor-agent-wrapper
+```
+
+Paths may be absolute, bare executable names already on your `PATH`, `~`-prefixed, or relative to the config directory (`~/.iteration/`). The override replaces only the binary name; all standard arguments are preserved, so the replacement must be CLI-compatible with the original agent. On Windows, `.cmd` and `.bat` wrappers are supported, including bare names resolved from `PATH`. For `rovodev`, the override must point to an `acli`-compatible binary since iteration invokes it as `<bin> rovodev serve ...`.
+
+### Sleep Prevention
+
+When sleep prevention is enabled, `iteration` uses the native mechanism for your OS: `caffeinate` on macOS, `systemd-inhibit` on Linux, and a small PowerShell helper backed by `SetThreadExecutionState` on Windows.
+A run is never aborted because that mechanism is unavailable; instead the exit summary adds a `sleep` line reporting either that prevention could not be started for the run, or that the helper started but never confirmed it was holding the machine awake, so the machine may have slept.
+
+## Debug Logs
+
+Every run writes a JSONL debug log to `.iteration/runs/<runId>/iteration.log` alongside `notes.md`. Lifecycle events for the orchestrator, agent, and HTTP requests are captured with elapsed timings and (for failures) the full `error.cause` chain, which is what you need to tell a bare `TypeError: fetch failed` apart from an undici `UND_ERR_HEADERS_TIMEOUT`. The agent's own streaming output still goes to the per-iteration `iteration-<n>.jsonl` file next to it.
+Raw ACP command specs are redacted as `acp:custom`/`custom` in debug logs and related errors, so local paths or secrets in custom commands are not written to `iteration.log`.
+
+Including a snippet of `iteration.log` is the single most useful thing you can attach when filing an issue.
+
+## Telemetry
+
+None. This fork sends no telemetry or usage data of any kind.
+
+## Agents
+
+`iteration` supports seven native agents plus ACP targets. ACP support is powered by [`acpx`](https://github.com/openclaw/acpx), which is bundled with `iteration` and provides the runtime and agent registry for `acp:<target-or-command>` specs.
+
+| Agent              | Flag                              | Requirements                                                                                                                                                                                            | Notes                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Claude Code        | `--agent claude`                  | Install Anthropic's `claude` CLI and sign in first.                                                                                                                                                     | `iteration` invokes `claude` directly in non-interactive mode. After Claude emits a successful structured result, `iteration` treats that result as final and shuts down any lingering Claude process tree after a short grace period.                                                                                                                                                               |
+| Codex              | `--agent codex`                   | Install OpenAI's `codex` CLI and sign in first.                                                                                                                                                         | `iteration` invokes `codex exec` directly in non-interactive mode.                                                                                                                                                                                                                                                                                                                              |
+| GitHub Copilot CLI | `--agent copilot`                 | Install GitHub Copilot CLI and sign in first.                                                                                                                                                           | `iteration` invokes `copilot` directly in non-interactive JSONL mode. Copilot currently exposes assistant output tokens, but not full input/cache token totals; see https://github.com/github/copilot-cli/issues/1152.                                                                                                                                                                          |
+| Pi                 | `--agent pi`                      | Install the `pi` CLI and configure a usable provider/model first.                                                                                                                                       | `iteration` invokes `pi` directly in JSON mode, appends the final output schema to the prompt, and disables Pi session persistence with `--no-session`.                                                                                                                                                                                                                                         |
+| Cursor CLI         | `--agent cursor`                  | Install Cursor's CLI and sign in first (`cursor-agent login`).                                                                                                                                          | `iteration` invokes `cursor-agent` (falling back to the `agent` name) directly in non-interactive `--print` stream-json mode, appends the final output schema to the prompt, and defaults to `--force`, `--trust`, and `--approve-mcps` unless you override those flags. After Cursor emits a non-error result, `iteration` shuts down any lingering Cursor process tree after a short grace period. |
+| Rovo Dev           | `--agent rovodev`                 | Install Atlassian's `acli` and authenticate it with Rovo Dev first.                                                                                                                                     | `iteration` starts a local `acli rovodev serve --disable-session-token <port>` process automatically in the repo workspace.                                                                                                                                                                                                                                                                     |
+| OpenCode           | `--agent opencode`                | Install `opencode` and configure at least one usable model provider first.                                                                                                                              | `iteration` starts a local `opencode serve --hostname 127.0.0.1 --port <port> --print-logs` process automatically, creates a session for each iteration, and applies a blanket allow rule so tool calls do not block on prompts.                                                                                                                                                                |
+| ACP target         | `--agent acp:<target-or-command>` | Install and authenticate the target supported by the bundled [`acpx`](https://github.com/openclaw/acpx) registry, such as `acp:gemini` or `acp:grok-build`, or pass a quoted custom ACP server command. | `iteration` runs the target through ACP with a persistent per-run session under `.iteration/runs/<runId>/acp-sessions`; token usage and `--max-tokens` use ACP `used` deltas when available, with prompt-length plus tool-call estimates as a fallback, and `agentPathOverride` and `agentArgsOverride` do not apply.                                                                                |
+
+## Development
+
+If you want to contribute changes back to this repo, see [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the required workflow, dev commands, and repo conventions.
