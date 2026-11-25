@@ -42,7 +42,7 @@ const LABEL_WIDTH = 16;
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 // eslint-disable-next-line no-control-regex
 const ANSI_TOKEN_RE = /\x1b\[[0-9;]*m/g;
-const NO_MISTAKES_URL = "https://github.com/kunchenguid/no-mistakes";
+const PR_GUARDIAN_URL = "https://github.com/entrancestone/pr-guardian";
 
 export function stripExitSummaryAnsi(text: string): string {
   return text.replace(ANSI_RE, "");
@@ -285,8 +285,8 @@ export function renderExitSummary(options: ExitSummaryOptions): string {
     continuationLine(s.cyan(`git diff --stat ${options.baseRef}..HEAD`)),
     continuationLine(s.cyan("gh pr create")),
     "",
-    commandLine(s.dim("too much"), `${s.cyan("git push no-mistakes")}:`),
-    commandLine(s.dim("to review?"), s.blueUnderline(NO_MISTAKES_URL)),
+    commandLine(s.dim("too much"), `${s.cyan("git push pr-guardian")}:`),
+    commandLine(s.dim("to review?"), s.blueUnderline(PR_GUARDIAN_URL)),
   ];
 
   return `\n${lines.join("\n")}\n`;

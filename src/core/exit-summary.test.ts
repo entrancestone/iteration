@@ -53,7 +53,7 @@ describe("renderExitSummary", () => {
     );
     expect(summary).toContain("next steps      git log --oneline main..HEAD");
     expect(summary).toContain(
-      "too much        git push no-mistakes:\n  to review?      https://github.com/kunchenguid/no-mistakes",
+      "too much        git push pr-guardian:\n  to review?      https://github.com/entrancestone/pr-guardian",
     );
     expect(summary).not.toContain("moon log");
   });

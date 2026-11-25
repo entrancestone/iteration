@@ -815,7 +815,7 @@ describe("cli", () => {
     );
     expect(stdout).toContain("branch diff");
     expect(stdout).toContain("6 commits");
-    expect(stdout).toContain("git push no-mistakes");
+    expect(stdout).toContain("git push pr-guardian");
   });
 
   it("continues finalization when the end-state sidecar cannot be written", async () => {

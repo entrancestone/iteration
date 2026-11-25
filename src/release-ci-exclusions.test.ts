@@ -9,7 +9,7 @@ const workflowsDir = join(root, ".github", "workflows");
 
 /**
  * Derive the exact release-please output set from config + workflow inputs.
- * Keep this aligned with the fleet audit rule in firstmate's release-please CI
+ * Keep this aligned with the fleet audit rule in agent-secretary's release-please CI
  * report: node -> package.json (+ package-lock.json if present), changelog,
  * extra-files, and the manifest path.
  */
@@ -191,7 +191,7 @@ describe("release-please CI exclusions", () => {
     expect(prWorkflows.map((w) => w.name).sort()).toEqual([
       "ci.yml",
       "guard-generated-files.yml",
-      "no-mistakes-required.yml",
+      "pr-guardian-required.yml",
     ]);
 
     const failures: string[] = [];
@@ -220,13 +220,13 @@ describe("release-please CI exclusions", () => {
     expect(on!.workflow_dispatch).toBeUndefined();
   });
 
-  it("keeps bot author exemptions on guard and no-mistakes jobs", () => {
+  it("keeps bot author exemptions on guard and pr-guardian jobs", () => {
     const guard = readFileSync(
       join(workflowsDir, "guard-generated-files.yml"),
       "utf8",
     );
     const nmr = readFileSync(
-      join(workflowsDir, "no-mistakes-required.yml"),
+      join(workflowsDir, "pr-guardian-required.yml"),
       "utf8",
     );
     expect(guard).toContain("github-actions[bot]");

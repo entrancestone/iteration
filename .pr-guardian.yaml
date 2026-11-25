@@ -1,4 +1,4 @@
-# Per-repo no-mistakes overrides.
+# Per-repo pr-guardian overrides.
 
 # Keep pipeline test evidence (transcripts, screenshots, fixture homes) in
 # this repo so runs can attach it from the checkout instead of a temp dir.

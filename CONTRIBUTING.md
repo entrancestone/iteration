@@ -2,29 +2,29 @@
 
 Thanks for wanting to contribute. One rule up front:
 
-**Human-authored pull requests targeting `main` must be raised through [`no-mistakes`](https://github.com/kunchenguid/no-mistakes).**
+**Human-authored pull requests targeting `main` must be raised through [`pr-guardian`](https://github.com/entrancestone/pr-guardian).**
 We require this to reduce the maintainer's burden of reviewing and merging contributions.
 
-`no-mistakes` puts a local git proxy in front of your real remote. Pushing through it runs an AI-driven review/test/lint pipeline in an isolated worktree, forwards the push upstream only after every check passes, and opens a clean PR automatically.
+`pr-guardian` puts a local git proxy in front of your real remote. Pushing through it runs an AI-driven review/test/lint pipeline in an isolated worktree, forwards the push upstream only after every check passes, and opens a clean PR automatically.
 
-The GitHub Actions check `PR must be raised via no-mistakes` validates the deterministic signature and completed pipeline attestation that no-mistakes writes to PRs targeting `main`. Release and dependency bots are exempt so their automation keeps working, but regular contributor PRs without valid no-mistakes output will not be reviewed or merged.
+The GitHub Actions check `PR must be raised via pr-guardian` validates the deterministic signature and completed pipeline attestation that pr-guardian writes to PRs targeting `main`. Release and dependency bots are exempt so their automation keeps working, but regular contributor PRs without valid pr-guardian output will not be reviewed or merged.
 
 ## Workflow
 
 1. Fork the repo and clone your fork.
 2. Create a branch and make your changes.
-3. Initialize the gate in the repo once: `no-mistakes init`.
+3. Initialize the gate in the repo once: `pr-guardian init`.
 4. Commit your changes.
 5. Push through the gate instead of pushing to `origin`:
 
    ```sh
-   git push no-mistakes
+   git push pr-guardian
    ```
 
-6. Run `no-mistakes` to attach to the pipeline, watch findings, and auto-fix or review as needed.
+6. Run `pr-guardian` to attach to the pipeline, watch findings, and auto-fix or review as needed.
 7. Once the pipeline passes, it forwards the push upstream and opens the PR for you.
 
-See the [no-mistakes quick start](https://kunchenguid.github.io/no-mistakes/start-here/quick-start/) for the full first-run walkthrough.
+See the [pr-guardian quick start](https://github.com/entrancestone/pr-guardian#readme) for the full first-run walkthrough.
 
 ## Developing
 
